@@ -1,0 +1,52 @@
+do bkp of mysql and send to storage
+
+mkdir mysql-data-`date '+%m-%d-%Y'`;
+for i in `mysql -N -r -e "show databases"|grep -v '+---' | awk '{print $1}'`;
+do echo "=== $i ===";
+mysqldump --add-drop-table $i > mysql-data-`date '+%m-%d-%Y'`/$i'_'`date '+%m-%d-%Y'`.sql;
+done;
+ncftpput -R -v -u "login" -p "password" ftp /euagenda-mysql mysql-data-`date '+%m-%d-%Y'`;
+
+
+
+##delete from storage after x days
+
+mkdir mysql-data-`date '+%m-%d-%Y'`;
+for i in `mysql -N -r -e "show databases"|grep -v '+---' | awk '{print $1}'`;
+do echo "=== $i ===";
+mysqldump --add-drop-table $i > mysql-data-`date '+%m-%d-%Y'`/$i'_'`date '+%m-%d-%Y'`.sql;
+done;
+ncftpput -R -v -u "u207451" -p "qj4tSPJk0UV95g8R" u207451.your-storagebox.de /euagenda-mysql mysql-data-`date '+%m-%d-%Y'`;
+
+[root@admin ~]# cat /root/mysql/mysql-delete.sh
+#!/bin/bash
+# get a list of files and dates from ftp and remove files older than ndays
+ftpsite="u207451.your-storagebox.de"
+ftpuser="u207451"
+ftppass="qj4tSPJk0UV95g8R"
+#remote folder in which you want to delete files
+putdir="/euagenda-mysql"
+nullfolder="/tmp/null"
+
+ndays=10
+
+mkdir -p nullfolder
+MM=`date --date="$ndays days ago" +%b`
+DD=`date --date="$ndays days ago" +%d`
+
+echo removing files older than $MM $DD
+#The no-ssl is there because it's on a local network and remote doesn't support ftp
+lftp -e "set ftp:ssl-allow no; mirror $putdir $nullfolder --older-than=now-${ndays}days --Remove-source-files; exit" -u $ftpuser,$ftppass $ftpsite
+
+rm $nullfolder/* -Rf
+
+echo Delete local mysql files older than 4 days:
+find /root/mysql-data* -mtime +4 -exec rm -rf {} \;
+echo Done;
+
+
+
+## delete from local server after 2 days
+
+find mysql-data*  -type d -ctime -2 -exec rm -rf {} \;
+
